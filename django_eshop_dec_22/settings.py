@@ -83,7 +83,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'django_eshop_dec_22',
         'USER': 'root',
-        'PASSWORD': '',
+        'PASSWORD': 'ibdjilla',
         'HOST': '127.0.0.1',
         'PORT': '3306',
     }
