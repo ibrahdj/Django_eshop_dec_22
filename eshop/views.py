@@ -1,7 +1,8 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from .models import Product, Category
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.db.models import Count
 
 # Create your views here.
 def index(request):
@@ -13,14 +14,36 @@ def index(request):
     }
     return render(request, "eshop/index.html", context)
 
-def shop(request, nbr=6):
-    products = Product.objects.all()
+def shop(request, categ='all'):
     categories = Category.objects.all()
     total = sum([category.products.count() for category in categories])
     page = request.GET.get('page', 1)
-    # nbr = request.GET.get('nbr', 6)
+    perpage = request.GET.get('per', 6)
+    sort = request.GET.get('sort', 'latest')
 
-    paginator = Paginator(products, nbr)
+    query = request.GET.get('q', '')
+    if categ == 'all':
+        if not query:
+            if sort == 'latest':
+                products = Product.objects.all()
+            elif sort == 'popular':
+                products = Product.objects.all().annotate(nbr_likes=Count('likes')).order_by('-nbr_likes')
+            else:
+                products = Product.objects.all().annotate(nbr_reviews=Count('reviews__rate')).order_by('-nbr_reviews')
+        else:
+            products = Product.objects.filter(name__icontains=query)
+    else:
+        if not query:
+            if sort == 'latest':
+                products = Product.objects.filter(category__slug = categ)
+            elif sort == 'popular':
+                products = Product.objects.filter(category__slug=categ).annotate(nbr_likes=Count('likes')).order_by('-nbr_likes')
+            else:
+                products = Product.objects.filter(category__slug=categ).annotate(nbr_reviews=Count('reviews__rate')).order_by('-nbr_reviews')
+        else:
+            products = Product.objects.filter(category__slug=categ).filter(name__icontains=query)
+
+    paginator = Paginator(products, perpage)
     try:
         produit = paginator.page(page)
     except PageNotAnInteger:
@@ -34,6 +57,32 @@ def shop(request, nbr=6):
          'total': total
     }
     return render(request,"eshop/shop.html", context)
+
+
+def search(request):
+    query = request.GET.get('q', '')
+    if not query:
+        return redirect('shop')
+
+    page = request.GET.get('page', 1)
+    perpage = request.GET.get('per', 6)
+    products = Product.objects.filter(name__icontains=query)
+    categories = Category.objects.all()
+
+    paginator = Paginator(products, perpage)
+    try:
+        products = paginator.page(page)
+    except PageNotAnInteger:
+        products = paginator.page(1)
+    except EmptyPage:
+        products = paginator.page(paginator.num_pages)
+
+    context = {
+         'products' : products,
+         'categories' :categories,
+    }
+    return render(request,"eshop/shop.html", context)
+
 
 def detail(request, id):
     product = Product.objects.get(id=id)
